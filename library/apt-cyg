@@ -1,0 +1,84 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# $ANSIBLE_HOME/hacking/test-module -m ./library/serf -a "version=0.3.0 prefix=$HOME/bin"
+DOCUMENTATION = '''
+---
+module: apt-cyg
+short_description: run apt-cyg
+description:
+  - run apt-cyg
+options:
+  name:
+    description:
+      - install apt-cyg package
+    required: true
+    default: null
+author: naokirin
+'''
+
+EXAMPLES='''
+- apt-cyg: name=ruby
+  description: install apt-cyg ruby package
+'''
+
+import sys
+import tempfile
+import zipfile
+import shutil
+import re
+
+from ansible.module_utils.basic import *
+
+def main():
+
+    module = AnsibleModule(
+        argument_spec=dict(
+            name=dict(default=None, required=True),
+        ),
+        supports_check_mode=True,
+    )
+
+    name = module.params['name']
+    check_mode = module.check_mode
+
+    try:
+        apt_cyg_path = module.get_bin_path('apt-cyg', required=True)
+
+        current_version = installed_version(module, apt_cyg_path, name)
+        latest = latest_version(module, apt_cyg_path, name)
+        if current_version == None or latest != current_version:
+            if check_mode:
+                module.exit_json(changed=True)
+                return
+        else:
+            module.exit_json(changed=False)
+            return
+
+        module.run_command('%s remove %s' % (apt_cyg_path, name), check_rc=True)
+        module.run_command('%s install %s' % (apt_cyg_path, name), check_rc=True)
+        module.exit_json(changed=True, msg='%s %s' % (current_version, latest))
+
+    except Exception as e:
+        module.fail_json(msg=str(e))
+
+def installed_version(module, apt_cyg_path, name):
+    (rc, out, err) = module.run_command("awk '$1~pkg && $0=$2' pkg=^%s$ /etc/setup/installed.db" % (name))
+    r = re.compile(r"%s-([0-9a-zA-Z]+\.[0-9a-zA-Z]+\.[0-9a-zA-Z]+-[0-9a-zA-Z]+)" % (name))
+    version = r.search(out)
+    installed_version = None
+    if version != None:
+        installed_version = version.group(1)
+
+    return installed_version
+
+def latest_version(module, apt_cyg_path, name):
+    (rc, out, err) = module.run_command('%s show %s' % (apt_cyg_path, name))
+    r = re.compile(r"version: ([0-9\.-]+)")
+    version = r.search(out.strip())
+    latest_version = None
+    if version != None:
+        latest_version = version.group(1)
+
+    return latest_version
+
+main()
