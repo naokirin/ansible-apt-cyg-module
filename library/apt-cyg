@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# $ANSIBLE_HOME/hacking/test-module -m ./library/serf -a "version=0.3.0 prefix=$HOME/bin"
+# $ANSIBLE_HOME/hacking/test-module -m ./library/apt-cyg -a "version=0.1.0 prefix=$HOME/bin"
 DOCUMENTATION = '''
 ---
 module: apt-cyg
@@ -10,15 +10,21 @@ description:
 options:
   name:
     description:
-      - install apt-cyg package
+      - apt-cyg package name
     required: true
     default: null
+  state:
+    description:
+      - choiced package version state
+    required: false
+    choices: [ "latest", "anything" ]
+    default: latest
 author: naokirin
 '''
 
 EXAMPLES='''
-- apt-cyg: name=ruby
-  description: install apt-cyg ruby package
+- apt-cyg: name=ruby state="latest"
+  description: install latest apt-cyg ruby package
 '''
 
 import sys
@@ -31,14 +37,21 @@ from ansible.module_utils.basic import *
 
 def main():
 
+    states = [
+        'anything',
+        'latest',
+    ]
+
     module = AnsibleModule(
         argument_spec=dict(
             name=dict(default=None, required=True),
+            state=dict(default='latest', choices=states),
         ),
         supports_check_mode=True,
     )
 
     name = module.params['name']
+    state = module.params['state']
     check_mode = module.check_mode
 
     try:
@@ -46,6 +59,11 @@ def main():
 
         current_version = installed_version(module, apt_cyg_path, name)
         latest = latest_version(module, apt_cyg_path, name)
+
+        if state == 'anything' and current_version != None:
+            module.exit_json(changed=False)
+            return
+
         if current_version == None or latest != current_version:
             if check_mode:
                 module.exit_json(changed=True)
