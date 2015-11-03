@@ -10,10 +10,11 @@ This is a easier usage.
 
 ```
 $ git clone https://github.com/naokirin/ansible-apt-cyg-module.git
+$ cd ansible-apt-cyg-module
 $ cp -r library /your/playbook/path
 ```
 
-**your.yml**
+**your-playbook.yml**
   ```
   ---
   - hosts: cygwin
